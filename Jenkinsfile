@@ -93,7 +93,7 @@ pipeline {
             }
             steps {
                 sh '''
-                    #make all-${COIN_LONG_NAME}
+                    make all-${COIN_LONG_NAME}
                     KEYS=$(aws s3api list-objects --bucket artifacts.node40.com --prefix blockbook/${COIN}/latest --query Contents[].Key)
                     if [ "${KEYS}" != "null" ]; then
                         echo $KEYS | jq '{Objects:[{Key:.[]}]}' > delete.json
@@ -101,14 +101,14 @@ pipeline {
                     else
                         echo No artifacts to delete.
                     fi
-                    #aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/latest --recursive --exclude "*" --include "*.deb"
-                    #aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/${VERSION} --recursive --exclude "*" --include "*.deb"
+                    aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/latest --recursive --exclude "*" --include "*.deb"
+                    aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/${VERSION} --recursive --exclude "*" --include "*.deb"
                 '''
                 script {
                     def jobName = URLDecoder.decode(env.JOB_NAME, "UTF-8" )
                     def jobUrl = URLDecoder.decode(env.BUILD_URL, "UTF-8" )
                     def buildStatus = currentBuild.result
-                    notifySlack("Test", buildStatus, jobName, jobUrl, VERSION)
+                    notifySlack("Production", buildStatus, jobName, jobUrl, VERSION)
                 }
 
             }

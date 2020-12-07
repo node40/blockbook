@@ -95,8 +95,12 @@ pipeline {
                 sh '''
                     #make all-${COIN_LONG_NAME}
                     KEYS=$(aws s3api list-objects --bucket artifacts.node40.com --prefix blockbook/${COIN}/latest --query Contents[].Key)
-                    echo $KEYS | jq '{Objects:[{Key:.[]}]}' > delete.json
-                    aws s3api delete-objects --bucket artifacts.node40.com --delete file://delete.json
+                    if[ "${KEYS}" -ne "null" ];then
+                        echo $KEYS | jq '{Objects:[{Key:.[]}]}' > delete.json
+                        aws s3api delete-objects --bucket artifacts.node40.com --delete file://delete.json
+                    else
+                        echo No artifacts to delete.
+                    fi
                     #aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/latest --recursive --exclude "*" --include "*.deb"
                     #aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/${VERSION} --recursive --exclude "*" --include "*.deb"
                 '''

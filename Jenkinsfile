@@ -1,5 +1,25 @@
 import groovy.json.JsonSlurper
 
+def notifySlack(envName, status, jobName, jobUrl, version) {
+    def buildStatus = status ?: 'SUCCESS'
+
+    def color
+
+    if (buildStatus == 'SUCCESS') {
+        color = '#BDFFC3'
+    } else if (buildStatus == 'UNSTABLE') {
+        color = '#FFFE89'
+    } else {
+        color = '#FF9FA1'
+    }
+
+    slackSend ([
+        channel: "#notifications-build",
+        color: "${color}",
+        message: "${buildStatus}: Blockbook binary job `${jobName}` #${env.BUILD_NUMBER}\n(${jobUrl})\nEnvironment: ${envName}\nVersion: ${version}"
+    ]);
+}
+
 def buildVersionString(branchName, buildNumber) {
     if (branchName == 'master') {
         return "0.0.${buildNumber}"
@@ -56,12 +76,8 @@ pipeline {
                     echo "PATH=$PATH"
                     echo "NAME=$NAME"
                     echo "VERSION=$VERSION"
-                    echo "ACTIVE_COLOR=$ACTIVE_COLOR"
-                    echo "BLUE_ACTIVE=$BLUE_ACTIVE"
-                    echo "GREEN_ACTIVE=$GREEN_ACTIVE"
                     echo "COIN=$COIN"
                     echo "COIN_LONG_NAME=$COIN_LONG_NAME"
-                    echo "PROTOCOL=$PROTOCOL"
                 '''
             }
         }
@@ -77,10 +93,20 @@ pipeline {
             }
             steps {
                 sh '''
-                    make all-${COIN_LONG_NAME}
-                    aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/latest --recursive --exclude "*" --include "*.deb"
-                    aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/${VERSION} --recursive --exclude "*" --include "*.deb"
+                    #make all-${COIN_LONG_NAME}
+                    KEYS=$(aws s3api list-objects --bucket artifacts.node40.com --prefix blockbook/${COIN}/latest --query Contents[].Key)
+                    echo $KEYS | jq '{Objects:[{Key:.[]}]}' > delete.json
+                    aws s3api delete-objects --bucket artifacts.node40.com --delete file://delete.json
+                    #aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/latest --recursive --exclude "*" --include "*.deb"
+                    #aws s3 cp ./build/ s3://artifacts.node40.com/blockbook/${COIN}/${VERSION} --recursive --exclude "*" --include "*.deb"
                 '''
+                script {
+                    def jobName = URLDecoder.decode(env.JOB_NAME, "UTF-8" )
+                    def jobUrl = URLDecoder.decode(env.BUILD_URL, "UTF-8" )
+                    def buildStatus = currentBuild.result
+                    notifySlack("Test", buildStatus, jobName, jobUrl, VERSION)
+                }
+
             }
         }
     }
